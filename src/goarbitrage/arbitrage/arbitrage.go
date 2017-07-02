@@ -3,6 +3,7 @@ package arbitrage
 import (
 	"fmt"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/mgutz/logxi/v1"
@@ -35,21 +36,40 @@ func New() *ArbitrageStrategy {
 }
 
 func (a *ArbitrageStrategy) updateDepths() {
-	var (
-		done chan struct{}
-	)
-
+	wg := sync.WaitGroup{}
+	done := make(chan struct{})
 	resp := make(chan exchange.TaskResponse, len(a.Exchanges))
+
 	for _, v := range a.Exchanges {
-		go v.UpdateDepth(done, resp)
+		wg.Add(1)
+		go v.UpdateDepth(&wg, done, resp)
 	}
 
-	for n := 0; n < len(a.Exchanges); n++ {
-		select {
-		case data := <-resp:
-			a.Depths[data.Name] = data.OrderBook
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		cnt := 0
+		timeout := time.After(5 * time.Second)
+
+		for {
+			select {
+			case <-timeout:
+				close(done)
+				return
+			case data := <-resp:
+				cnt++
+				log.Info("name:", "info", data.Name)
+				a.Depths[data.Name] = data.OrderBook
+
+				if cnt == len(a.Exchanges) {
+					return
+				}
+			}
 		}
-	}
+	}()
+
+	wg.Wait()
 }
 
 func (a *ArbitrageStrategy) tick() {
@@ -78,7 +98,8 @@ func (a *ArbitrageStrategy) arbitrageOpportunity(kask, kbid string) {
 	perc := (r.WeightedSellPrice - r.WeightedBuyPrice) / r.BuyPrice * 100
 	log.Info("Percent:", "info", perc)
 
-	if r.Profit > config.Cfg.Settings.ProfitThresh && perc > config.Cfg.Settings.PercThresh {
+	s := config.Cfg.Settings
+	if r.Profit > s.ProfitThresh && perc > s.PercThresh {
 		log.Info(
 			fmt.Sprintf(
 				"profit: %f CNY with volume: %f BTC - buy at %.4f (%s) sell at %.4f (%s) ~%.2f%%",
@@ -92,14 +113,14 @@ func (a *ArbitrageStrategy) arbitrageOpportunity(kask, kbid string) {
 
 func (a *ArbitrageStrategy) arbitrageDepthOpportunity(kask, kbid string) ProfitStruct {
 	var (
-		profit, tempProfit     ProfitStruct
+		profit                 ProfitStruct
 		bestAskPos, bestBidPos int
 	)
 
 	askPos, bidPos := a.getMaxDepth(kask, kbid)
 	for i := 0; i < askPos+1; i++ {
 		for j := 0; j < bidPos+1; j++ {
-			tempProfit = a.getProfitFor(i, j, kask, kbid)
+			tempProfit := a.getProfitFor(i, j, kask, kbid)
 
 			if tempProfit.Profit > 0 && tempProfit.Profit >= profit.Profit {
 				profit = tempProfit
@@ -156,7 +177,7 @@ func (a *ArbitrageStrategy) getProfitFor(askPos, bidPos int, kask, kbid string) 
 		maxAmountSell += a.Depths[kbid].Bids[j].Amount
 	}
 
-	log.Info("Volume", "info", config.Cfg.Settings.MaxTxVolume)
+	//log.Info("Volume", "info", config.Cfg.Settings.MaxTxVolume)
 	maxAmount := math.Min(math.Min(maxAmountBuy, maxAmountSell), float64(1))
 
 	var (
@@ -214,7 +235,7 @@ func (a *ArbitrageStrategy) Loop() {
 		a.tick()
 
 		log.Info("Refrash rate:", "info", config.Cfg.Settings.RefreshRate)
-		time.Sleep(time.Second * 10)
+		time.Sleep(time.Second * 5)
 	}
 
 	return

@@ -1,7 +1,7 @@
 {
   "telegram": {
     "enable": false,
-    "api_key": "https://t.me/joinchat/AAAAAENTRk3DkOxLCC2slQ",
+    "api_key": "327028013:AAGrDX3TSRqwGgyxyuagM7LpCmboF1w0-rY",
     "chat_id": 1,
     "debug": true
   },

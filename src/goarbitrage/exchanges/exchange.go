@@ -6,6 +6,7 @@ import (
 
 	"goarbitrage/common"
 	"goarbitrage/config"
+	"sync"
 )
 
 const (
@@ -43,7 +44,7 @@ type (
 
 	IBotExchange interface {
 		Setup(exch config.Exchange)
-		UpdateDepth(done chan struct{}, resp chan TaskResponse)
+		UpdateDepth(wg *sync.WaitGroup, done chan struct{}, resp chan TaskResponse)
 		SetDefaults()
 		GetName() string
 		GetSymbol() string
