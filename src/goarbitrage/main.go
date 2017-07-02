@@ -49,13 +49,10 @@ func main() {
 
 	// ---------------------------------------
 	log.Info("Load config file...")
-	err := config.Cfg.LoadFile()
-	if err != nil {
-		log.Fatal("Error load config file:", "fatal", err.Error())
-	}
+	config.Init()
 
 	// ---------------------------------------
-	cfg := config.GetConfig()
+	cfg := config.Cfg
 	if cfg.Telegram.Enable {
 		log.Info("Load telegram notify...")
 		if err := telegram.Init(); err != nil {
@@ -84,7 +81,7 @@ func main() {
 
 	// ---------------------------------------
 	log.Info("Init arbitrage...")
-	bot.arbitrer = new(arbitrage.ArbitrageStrategy)
+	bot.arbitrer = arbitrage.New()
 	bot.arbitrer.Exchanges = bot.exchanges
 
 	// ---------------------------------------

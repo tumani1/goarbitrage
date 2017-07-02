@@ -18,7 +18,7 @@ type (
 		shutdown  chan struct{}
 	}
 
-	Profit struct {
+	ProfitStruct struct {
 		Profit            float64
 		Volume            float64
 		WeightedBuyPrice  float64
@@ -28,33 +28,31 @@ type (
 	}
 )
 
+func New() *ArbitrageStrategy {
+	return &ArbitrageStrategy{
+		Depths: map[string]exchange.OrderBook{},
+	}
+}
+
 func (a *ArbitrageStrategy) updateDepths() {
 	var (
 		done chan struct{}
 	)
 
-	if a.Depths == nil {
-		a.Depths = map[string]exchange.OrderBook{}
-	}
-
 	resp := make(chan exchange.TaskResponse, len(a.Exchanges))
 	for _, v := range a.Exchanges {
-		log.Info("Send", "info", v.GetName())
 		go v.UpdateDepth(done, resp)
 	}
 
 	for n := 0; n < len(a.Exchanges); n++ {
 		select {
 		case data := <-resp:
-			log.Info("Resp:", "info", data.Name)
 			a.Depths[data.Name] = data.OrderBook
 		}
 	}
 }
 
 func (a *ArbitrageStrategy) tick() {
-	log.Info("tick function", "info")
-
 	for k1, _ := range a.Depths {
 		for k2, _ := range a.Depths {
 			if k1 == k2 {
@@ -72,27 +70,38 @@ func (a *ArbitrageStrategy) tick() {
 }
 
 func (a *ArbitrageStrategy) arbitrageOpportunity(kask, kbid string) {
-	result := a.arbitrageDepthOpportunity(kask, kbid)
-	if result.Volume == 0 || result.BuyPrice == 0 {
+	r := a.arbitrageDepthOpportunity(kask, kbid)
+	if r.Volume == 0 || r.BuyPrice == 0 {
 		return
 	}
 
-	perc := (result.WeightedSellPrice - result.WeightedBuyPrice) / result.BuyPrice * 100
+	perc := (r.WeightedSellPrice - r.WeightedBuyPrice) / r.BuyPrice * 100
 	log.Info("Percent:", "info", perc)
+
+	if r.Profit > config.Cfg.Settings.ProfitThresh && perc > config.Cfg.Settings.PercThresh {
+		log.Info(
+			fmt.Sprintf(
+				"profit: %f CNY with volume: %f BTC - buy at %.4f (%s) sell at %.4f (%s) ~%.2f%%",
+				r.Profit, r.Volume, r.BuyPrice, kask, r.SellPrice, kbid, perc,
+			), "info",
+		)
+	}
+
+	return
 }
 
-func (a *ArbitrageStrategy) arbitrageDepthOpportunity(kask, kbid string) Profit {
+func (a *ArbitrageStrategy) arbitrageDepthOpportunity(kask, kbid string) ProfitStruct {
 	var (
-		profit                 Profit
+		profit, tempProfit     ProfitStruct
 		bestAskPos, bestBidPos int
 	)
 
 	askPos, bidPos := a.getMaxDepth(kask, kbid)
 	for i := 0; i < askPos+1; i++ {
 		for j := 0; j < bidPos+1; j++ {
-			tempProfit := a.getProfitFor(i, j, kask, kbid)
+			tempProfit = a.getProfitFor(i, j, kask, kbid)
 
-			if tempProfit.Profit >= 0 && tempProfit.Profit >= profit.Profit {
+			if tempProfit.Profit > 0 && tempProfit.Profit >= profit.Profit {
 				profit = tempProfit
 				bestAskPos, bestBidPos = i, j
 			}
@@ -130,9 +139,9 @@ func (a *ArbitrageStrategy) getMaxDepth(kask, kbid string) (int, int) {
 	return askPos, bidPos
 }
 
-func (a *ArbitrageStrategy) getProfitFor(askPos, bidPos int, kask, kbid string) Profit {
+func (a *ArbitrageStrategy) getProfitFor(askPos, bidPos int, kask, kbid string) ProfitStruct {
 	if a.Depths[kask].Asks[askPos].Price >= a.Depths[kbid].Bids[bidPos].Price {
-		return Profit{}
+		return ProfitStruct{}
 	}
 
 	var (
@@ -147,7 +156,8 @@ func (a *ArbitrageStrategy) getProfitFor(askPos, bidPos int, kask, kbid string) 
 		maxAmountSell += a.Depths[kbid].Bids[j].Amount
 	}
 
-	maxAmount := math.Min(math.Min(maxAmountBuy, maxAmountSell), config.Cfg.Settings.MaxTxVolume)
+	log.Info("Volume", "info", config.Cfg.Settings.MaxTxVolume)
+	maxAmount := math.Min(math.Min(maxAmountBuy, maxAmountSell), float64(1))
 
 	var (
 		buyTotal, weightedBuyPrice float64
@@ -190,7 +200,7 @@ func (a *ArbitrageStrategy) getProfitFor(askPos, bidPos int, kask, kbid string) 
 	}
 
 	profit := sellTotal*weightedSellPrice - buyTotal*weightedBuyPrice
-	return Profit{
+	return ProfitStruct{
 		Profit:            profit,
 		Volume:            sellTotal,
 		WeightedSellPrice: weightedSellPrice,
@@ -203,6 +213,9 @@ func (a *ArbitrageStrategy) Loop() {
 		a.updateDepths()
 		a.tick()
 
+		log.Info("Refrash rate:", "info", config.Cfg.Settings.RefreshRate)
 		time.Sleep(time.Second * 10)
 	}
+
+	return
 }

@@ -6,8 +6,13 @@
     "debug": true
   },
   "settings": {
-     "refresh_interval": 10,
-     "max_tx_volume": 1
+     "refresh_rate": 10,
+     "max_tx_volume": 1.0,
+     "min_tx_volume": 0.5,
+     "profit_thresh": 3,
+     "perc_thresh": 0.01,
+     "arbitrage_buy_queue": 5,
+     "arbitrage_sell_queue": 5
   },
   "exchanges": {
     "Bitfinex": {

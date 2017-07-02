@@ -54,13 +54,10 @@ func (b *Bitfinex) GetOrderBook(symbol string, values url.Values) (BitfinexOrder
 	var response BitfinexOrderBook
 	path := common.EncodeURLValues(BITFINEX_API_URL+BITFINEX_ORDERBOOK+symbol, values)
 
-	log.Info("Path:", "info", path)
 	err := common.SendHTTPGetRequest(path, true, &response)
 	if err != nil {
 		return response, err
 	}
-
-	log.Info("Resp:", "info", "ok")
 
 	return response, nil
 }

@@ -18,8 +18,8 @@ func Init() error {
 		err error
 	)
 
-	cfg := config.GetConfig()
-	Bot, err = tgbotapi.NewBotAPI(cfg.Telegram.ApiKey)
+	c := config.Cfg
+	Bot, err = tgbotapi.NewBotAPI(c.Telegram.ApiKey)
 	if err != nil {
 		return fmt.Errorf("Init bot api", err.Error())
 	}
@@ -29,14 +29,14 @@ func Init() error {
 	}
 
 	log.Info("Authorized on account", "info", Bot.Self.UserName)
-	Bot.Debug = cfg.Telegram.Debug
+	Bot.Debug = c.Telegram.Debug
 
 	return nil
 }
 
 func SendTelegramMessage(message string) error {
-	cfg := config.GetConfig()
-	msg := tgbotapi.NewMessage(cfg.Telegram.ChatId, message)
+	c := config.Cfg
+	msg := tgbotapi.NewMessage(c.Telegram.ChatId, message)
 	_, err := Bot.Send(msg)
 	if err != nil {
 		return fmt.Errorf("Error send message:", err.Error())
