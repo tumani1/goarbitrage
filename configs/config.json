@@ -1,0 +1,36 @@
+{
+  "telegram": {
+    "enable": false,
+    "api_key": "https://t.me/joinchat/AAAAAENTRk3DkOxLCC2slQ",
+    "chat_id": 1,
+    "debug": true
+  },
+  "settings": {
+     "refresh_interval": 10,
+     "max_tx_volume": 1
+  },
+  "exchanges": {
+    "Bitfinex": {
+      "name": "Bitfinex",
+      "enabled": true,
+      "verbose": false,
+      "RESTPollingDelay": 10,
+      "auth_api_support": false,
+      "api_key": "Key",
+      "api_secret": "Secret",
+      "client_id": "",
+      "symbol": "BTCUSD"
+    },
+    "Gemini": {
+      "name": "Gemini",
+      "enabled": true,
+      "verbose": false,
+      "RESTPollingDelay": 10,
+      "auth_api_support": false,
+      "api_key": "Key",
+      "api_secret": "Secret",
+      "client_id": "",
+      "symbol": "BTCUSD"
+    }
+  }
+}
